@@ -1,0 +1,17 @@
+# Development tooling and runtime scratch
+/vendor/
+/.cache/
+/.tmp/
+/.playwright-cli/
+/.playwright/
+/.phpunit.cache/
+/.phpunit.result.cache
+/composer.phar
+
+# Task-local published artifacts
+/published/
+
+/dist/
+/.codex/
+
+__pycache__/

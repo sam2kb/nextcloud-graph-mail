@@ -1,0 +1,56 @@
+<?xml version="1.0"?>
+<!--
+  SPDX-FileCopyrightText: 2026 sam2kb
+  SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<info xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:noNamespaceSchemaLocation="https://apps.nextcloud.com/schema/apps/info.xsd">
+  <id>graph_mail</id>
+  <name>Graph Mail</name>
+  <summary>Microsoft Graph transport for Nextcloud system mail</summary>
+  <description><![CDATA[
+Routes Nextcloud's central system mail through a bundled sendmail-compatible helper that
+submits messages with Microsoft Graph. Configure a Microsoft 365 sender once and all
+central-mailer callers (shares, password reset, notifications, LibreSign, ...) use Graph
+without changes. This app does not provide inbox access and does not intercept the Mail
+app's separate per-user accounts.
+]]></description>
+  <version>0.1.1</version>
+  <licence>agpl</licence>
+  <author>sam2kb</author>
+  <namespace>GraphMail</namespace>
+  <category>integration</category>
+  <types><prelogin/></types>
+  <bugs>https://github.com/sam2kb/nextcloud-graph-mail/issues</bugs>
+  <repository>https://github.com/sam2kb/nextcloud-graph-mail</repository>
+  <dependencies>
+    <nextcloud min-version="35" max-version="35"/>
+    <php min-version="8.3"/>
+  </dependencies>
+  <settings>
+    <admin>OCA\GraphMail\Settings\Admin</admin>
+    <admin-section>OCA\GraphMail\Settings\AdminSection</admin-section>
+  </settings>
+  <commands>
+    <command>OCA\GraphMail\Command\TransportCommand</command>
+    <command>OCA\GraphMail\Command\StatusCommand</command>
+    <command>OCA\GraphMail\Command\ConfigureCommand</command>
+    <command>OCA\GraphMail\Command\TestSendCommand</command>
+    <command>OCA\GraphMail\Command\DeactivateCommand</command>
+  </commands>
+  <repair-steps>
+    <post-migration>
+      <step>OCA\GraphMail\Repair\InstallHelperPermissions</step>
+    </post-migration>
+    <install>
+      <step>OCA\GraphMail\Repair\InstallHelperPermissions</step>
+    </install>
+    <uninstall>
+      <step>OCA\GraphMail\Repair\UninstallRestoreRouting</step>
+    </uninstall>
+  </repair-steps>
+  <background-jobs>
+    <job>OCA\GraphMail\BackgroundJob\PruneSubmissionLedger</job>
+    <job>OCA\GraphMail\BackgroundJob\ReconcileRouting</job>
+  </background-jobs>
+</info>

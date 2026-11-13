@@ -1,0 +1,2 @@
+# The helper is executed by the local mail transport, never served over HTTP.
+Require all denied

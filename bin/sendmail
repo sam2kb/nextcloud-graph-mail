@@ -1,0 +1,65 @@
+#!/bin/sh
+#
+# SPDX-FileCopyrightText: 2026 sam2kb
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Sendmail-compatible launcher for the Graph Mail transport.
+#
+# The only supported invocation is the SMTP-on-stdio profile used by
+# Nextcloud's native Symfony sendmail transport: a single "-bs" argument.
+# Everything after that is fixed; message content and configuration values
+# are never interpolated into a command.
+set -eu
+
+fail() {
+    # Diagnostics go to stderr: stdout belongs to the SMTP conversation.
+    printf '%s\n' "graph_mail helper: $1" >&2
+    exit "${2:-70}"
+}
+
+[ "$#" -eq 1 ] || fail "expected exactly one argument (-bs), got $#" 64
+[ "$1" = "-bs" ] || fail "unsupported sendmail mode '$1'; only -bs is supported" 64
+
+# Resolve the Nextcloud root. Standard installs are found by walking up from
+# this script; external app directories need GRAPH_MAIL_NC_ROOT or a known
+# install location. Every candidate is validated before use.
+root="${GRAPH_MAIL_NC_ROOT:-}"
+if [ -z "$root" ]; then
+    dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd) || fail "cannot resolve script directory" 69
+    while [ "$dir" != "/" ]; do
+        if [ -f "$dir/occ" ] && [ -f "$dir/version.php" ] && [ -f "$dir/lib/base.php" ] && [ -f "$dir/config/config.php" ]; then
+            root=$dir
+            break
+        fi
+        dir=$(dirname -- "$dir")
+    done
+fi
+[ -n "$root" ] || fail "cannot locate the Nextcloud root; set GRAPH_MAIL_NC_ROOT" 69
+[ -f "$root/occ" ] && [ -f "$root/lib/base.php" ] && [ -f "$root/config/config.php" ] || fail "invalid Nextcloud root '$root'" 69
+
+# Resolve the CLI PHP binary. The web server's PATH often differs from an SSH
+# session, so explicit candidates are tried after an operator override.
+php_bin="${GRAPH_MAIL_PHP_BIN:-}"
+if [ -z "$php_bin" ]; then
+    if command -v php >/dev/null 2>&1; then
+        php_bin=$(command -v php)
+    else
+        for candidate in /usr/local/bin/php /usr/bin/php /usr/bin/php8.5 /usr/bin/php8.4 /usr/bin/php8.3; do
+            if [ -x "$candidate" ]; then
+                php_bin=$candidate
+                break
+            fi
+        done
+    fi
+fi
+[ -n "$php_bin" ] && [ -x "$php_bin" ] || fail "cannot locate an executable CLI PHP; set GRAPH_MAIL_PHP_BIN" 69
+
+# A bounded foreground process preserves stdin and kills a stuck child.
+child_timeout="${GRAPH_MAIL_CHILD_TIMEOUT:-120}"
+case "$child_timeout" in
+    ''|*[!0-9]*) fail "GRAPH_MAIL_CHILD_TIMEOUT must be between 10 and 120 seconds" 64 ;;
+esac
+[ "$child_timeout" -ge 10 ] && [ "$child_timeout" -le 120 ] || fail "invalid child timeout" 64
+command -v timeout >/dev/null 2>&1 || fail "timeout with kill-after support is required" 69
+cd "$root" || fail "cannot change to Nextcloud root" 69
+exec timeout -k 5 -s TERM "$child_timeout" "$php_bin" "$root/occ" graph_mail:transport --stdio --no-warnings -n
